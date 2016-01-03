@@ -1,0 +1,76 @@
+#!/usr/local/bin/bash
+
+# This script makes a snapshot of several directories using rsync.
+# It's based on Rob Bos's snapshot script found at mikerubel.org.
+
+# Version 0.1, Geordy Kitchen, November 26, 2002
+# This script is released under the terms of the GNU General Public License, v2.0.
+# Version 0.2. Mods by RM for running under Nas4Free 10
+
+# Your crontab will typically look something like this:
+# 0 */4 * * * nice /mnt/soft2tb/make_snapshot hourly
+# 59 2 * * * nice /mnt/soft2tb/make_snapshot daily
+# 58 2 * * 0 nice /mnt/soft2tb/make_snapshot weekly
+# 57 2 1 * * nice /mnt/soft2tb/make_snapshot monthly
+
+echo `/bin/date` make_snapshot started
+
+# Configuration
+
+# Destination directory.
+dst=/mnt/nasbackup/backup
+
+srcroot="root@192.168.0.2"
+
+# Use a trailing slash for directories, just the filename for files.
+#src="/mnt/test/ /mnt/soft2tb/tmail/"
+src="/mnt/soft2tb/"
+
+# Number of times to run per day.
+hourly=6
+
+# Constants
+daily=7
+weekly=4
+monthly=18
+
+case $1 in 
+    hourly)
+        [ -d $dst/$1.1 ] && /bin/cp -al $dst/$1.1 $dst/$1.0
+        for i in $src; do
+            dirdst=`echo $i | /usr/bin/sed 's|^/||; s|[^/]*$||'`
+            [ -d $dst/$1.0/$dirdst ] || /bin/mkdir -p $dst/$1.0/$dirdst
+#	        /usr/local/bin/rsync -a --delete $srcroot:$i $dst/$1.0/$dirdst
+            /usr/local/bin/rsync -a --delete $i $dst/$1.0/$dirdst
+        done
+	;;
+    daily)
+        [ -d $dst/hourly.$hourly ] && /bin/mv $dst/hourly.$hourly $dst/daily.0
+	;;
+    weekly)
+        [ -d $dst/daily.$daily ] && /bin/mv $dst/daily.$daily $dst/weekly.0
+	;;
+    monthly)
+        [ -d $dst/weekly.$weekly ] && /bin/mv $dst/weekly.$weekly $dst/monthly.0
+	;;
+    *)
+	echo "syntax: $0 <type>"
+        exit 1
+	;;
+esac
+
+# Rotate the current list of backups, if we can.
+if [ -d $dst/$1.0 ]; then
+	oldest=`/bin/ls -d $dst/$1.* | /usr/bin/sort --version-sort | /usr/bin/tail -n 1 | /usr/bin/sed 's/^.*\.//'`
+	for i in `seq $oldest 0`; do
+	    /bin/mv $dst/$1.$i $dst/$1.$((i+1))
+	done
+fi
+
+# if we've rotated the last backup off the stack, remove it.
+[ -d $dst/$1.$((${!1}+1)) ] && /bin/rm -rf $dst/$1.$((${!1}+1))
+
+# finally, let's make the new snapshot reflect the current date.
+[ -d $dst/$1.1 ] && /usr/bin/touch $dst/$1.1
+
+echo `/bin/date` make_snapshot exited
