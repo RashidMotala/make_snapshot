@@ -1,0 +1,5 @@
+#!/usr/local/bin/bash
+
+echo Subject: Nas4Free $1 backup `/bin/date`
+echo
+/mnt/soft2tb/bin/make_snapshot $1
